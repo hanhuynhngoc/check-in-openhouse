@@ -16,7 +16,7 @@ app.use(express.static('public'));
 // ─── JSON "database" ──────────────────────────────────────────────────────────
 function loadDB() {
   if (!fs.existsSync(DB_FILE)) {
-    const init = { event_name: 'Su kien 2025', guests: [], nextId: 1 };
+    const init = { event_name: 'Open House 2026', guests: [], nextId: 1 };
     fs.writeFileSync(DB_FILE, JSON.stringify(init, null, 2));
     return init;
   }
@@ -87,13 +87,13 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     saveDB(db);
     res.json({ success: true, inserted, total: rows.length });
   } catch (e) {
-    res.status(400).json({ error: 'Loi doc file: ' + e.message });
+    res.status(400).json({ error: 'File error: ' + e.message });
   }
 });
 
 app.post('/api/guests', (req, res) => {
   const { name, info } = req.body;
-  if (!name) return res.status(400).json({ error: 'Thieu ten' });
+  if (!name) return res.status(400).json({ error: 'Name is missing' });
   const db = loadDB();
   const token = generateToken();
   db.guests.push({ id: db.nextId++, name: name.trim(), info: (info||'').trim(), token, checked_in: false, checked_at: null });
@@ -111,24 +111,24 @@ app.delete('/api/guests/:id', (req, res) => {
 app.get('/api/qr/:token', async (req, res) => {
   const db = loadDB();
   const guest = db.guests.find(g => g.token === req.params.token);
-  if (!guest) return res.status(404).json({ error: 'Khong tim thay' });
+  if (!guest) return res.status(404).json({ error: 'Not found' });
   const qr = await QRCode.toDataURL(req.params.token, { width: 300, margin: 2 });
   res.json({ qr, guest });
 });
 
 app.post('/api/checkin', (req, res) => {
   const { token } = req.body;
-  if (!token) return res.json({ status: 'invalid', message: 'Thieu token' });
+  if (!token) return res.json({ status: 'invalid', message: 'Token missing' });
 
   const db = loadDB();
   const guest = db.guests.find(g => g.token === token);
 
-  if (!guest) return res.json({ status: 'invalid', message: 'QR khong thuoc danh sach' });
+  if (!guest) return res.json({ status: 'invalid', message: 'QR is invalid' });
 
   if (guest.checked_in) {
     return res.json({
       status: 'duplicate',
-      message: 'QR nay da duoc su dung roi',
+      message: 'This QR has been used',
       guest: { name: guest.name, info: guest.info, checked_at: guest.checked_at }
     });
   }
@@ -138,7 +138,7 @@ app.post('/api/checkin', (req, res) => {
   guest.checked_at = now;
   saveDB(db);
 
-  res.json({ status: 'ok', message: 'Check-in thanh cong!', guest: { name: guest.name, info: guest.info, checked_at: now } });
+  res.json({ status: 'ok', message: 'Checked-in successfully!', guest: { name: guest.name, info: guest.info, checked_at: now } });
 });
 
 app.post('/api/reset-checkins', (req, res) => {
