@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Check-in Tại Cổng</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f0e;
+    --surface: #1a1a18;
+    --border: #2e2e2a;
+    --text: #f0efe8;
+    --muted: #888880;
+    --green: #2d7a4f;
+    --green-light: #e8f5ee;
+    --green-text: #1a5c38;
+    --red: #9b2c2c;
+    --red-light: #fbeaea;
+    --red-text: #7a1e1e;
+    --amber: #8a5c10;
+    --amber-light: #fef3d8;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+  .app { display: flex; flex-direction: column; height: 100vh; max-width: 420px; margin: 0 auto; }
+
+  /* Header */
+  .header { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .header-count { font-size: 13px; color: var(--muted); }
+  .count-badge { background: #2d7a4f; color: white; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; margin-left: 6px; }
+
+  /* Camera */
+  .camera-wrap { flex: 1; position: relative; overflow: hidden; background: #000; }
+  #reader { width: 100%; height: 100%; }
+  #reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+  #reader img { display: none !important; }
+
+  /* Overlay frame */
+  .scan-overlay { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+  .scan-frame { width: 220px; height: 220px; position: relative; }
+  .scan-frame::before, .scan-frame::after { content: ''; position: absolute; width: 36px; height: 36px; }
+  .corner { position: absolute; width: 36px; height: 36px; border-color: rgba(255,255,255,0.9); border-style: solid; }
+  .corner.tl { top: 0; left: 0; border-width: 3px 0 0 3px; }
+  .corner.tr { top: 0; right: 0; border-width: 3px 3px 0 0; }
+  .corner.bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; }
+  .corner.br { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+  .scan-line { position: absolute; left: 8px; right: 8px; height: 2px; background: rgba(100,255,160,0.8); animation: scanAnim 2s linear infinite; box-shadow: 0 0 8px rgba(100,255,160,0.5); }
+  @keyframes scanAnim { 0% { top: 8px; } 100% { top: calc(100% - 10px); } }
+  .scan-hint { position: absolute; bottom: -32px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; color: rgba(255,255,255,0.6); }
+
+  /* Paused overlay */
+  .paused-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; }
+  .paused-overlay.show { display: flex; }
+
+  /* Result panel */
+  .result-panel { padding: 16px 20px; min-height: 140px; display: flex; align-items: center; }
+  .result-idle { color: var(--muted); font-size: 13px; text-align: center; width: 100%; }
+  .result-card { width: 100%; border-radius: 12px; padding: 16px 20px; }
+  .result-card.ok { background: var(--green-light); border: 1px solid #a8dbbe; }
+  .result-card.duplicate { background: var(--red-light); border: 1px solid #f0b8b8; }
+  .result-card.invalid { background: #fef3d8; border: 1px solid #f0d88a; }
+  .result-top { display: flex; align-items: center; gap: 12px; }
+  .result-icon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+  .ok .result-icon { background: #2d7a4f; }
+  .duplicate .result-icon { background: var(--red); color: white; }
+  .invalid .result-icon { background: #b37d0a; color: white; }
+  .result-body {}
+  .result-status { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2px; }
+  .ok .result-status { color: var(--green-text); }
+  .duplicate .result-status, .invalid .result-status { color: var(--red-text); }
+  .invalid .result-status { color: #7a5a10; }
+  .result-name { font-size: 20px; font-weight: 700; line-height: 1.2; }
+  .ok .result-name { color: var(--green-text); }
+  .duplicate .result-name, .invalid .result-name { color: #5a1a1a; }
+  .invalid .result-name { color: #5a3a10; }
+  .result-meta { font-size: 13px; margin-top: 4px; }
+  .ok .result-meta { color: #2d5a3d; }
+  .duplicate .result-meta { color: #7a3030; }
+  .invalid .result-meta { color: #7a5a20; }
+
+  /* Bottom bar */
+  .bottom-bar { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .stat-mini { font-size: 12px; color: var(--muted); }
+  .stat-mini span { color: var(--text); font-weight: 600; }
+  .btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; }
+  .btn:hover { background: #252520; }
+
+  /* Permission state */
+  .no-camera { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 32px; gap: 12px; }
+  .no-camera h2 { font-size: 18px; }
+  .no-camera p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .no-camera button { background: white; color: #111; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="header-title" id="event-title">Check-in tại cổng</div>
+    <div class="header-count">Đã vào: <span class="count-badge" id="checked-count">0</span></div>
+  </div>
+
+  <div class="camera-wrap" id="camera-wrap">
+    <div id="reader"></div>
+    <div class="scan-overlay">
+      <div class="scan-frame">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+        <div class="scan-line" id="scan-line"></div>
+        <div class="scan-hint">Đưa QR vào khung</div>
+      </div>
+    </div>
+    <div class="paused-overlay" id="paused-overlay">
+      <div style="color:white;text-align:center;font-size:13px">
+        <div style="font-size:32px;margin-bottom:8px">⏸</div>
+        Nhấn bất kỳ để tiếp tục
+      </div>
+    </div>
+  </div>
+
+  <div class="result-panel" id="result-panel">
+    <div class="result-idle">Sẵn sàng quét QR...</div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="stat-mini">Tổng: <span id="total-count">—</span></div>
+    <a href="/" class="btn">⚙ Quản trị</a>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script>
+let scanner = null;
+let isPaused = false;
+let lastToken = null;
+let checkedCount = 0;
+
+// Load stats
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats').then(r => r.json());
+    document.getElementById('total-count').textContent = r.total;
+    document.getElementById('checked-count').textContent = r.checked;
+    checkedCount = r.checked;
+    if (r.event_name) document.getElementById('event-title').textContent = r.event_name;
+  } catch(e) {}
+}
+
+// Start scanner
+function startScanner() {
+  scanner = new Html5Qrcode('reader');
+  scanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+    onScan,
+    (err) => {}
+  ).catch(err => {
+    document.getElementById('camera-wrap').innerHTML = `
+      <div class="no-camera">
+        <h2>Cần quyền truy cập camera</h2>
+        <p>Vui lòng cho phép trình duyệt sử dụng camera, sau đó tải lại trang.</p>
+        <button onclick="location.reload()">Thử lại</button>
+      </div>
+    `;
+  });
+}
+
+// Handle scanned QR
+async function onScan(token) {
+  if (isPaused || token === lastToken) return;
+  lastToken = token;
+  isPaused = true;
+  document.getElementById('scan-line').style.animationPlayState = 'paused';
+
+  try {
+    const r = await fetch('/api/checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    }).then(r => r.json());
+
+    showResult(r);
+
+    if (r.status === 'ok') {
+      checkedCount++;
+      document.getElementById('checked-count').textContent = checkedCount;
+      vibrate([100]);
+    } else {
+      vibrate([100, 80, 100]);
+    }
+
+    // Auto resume after 3s
+    setTimeout(resume, 3000);
+  } catch (e) {
+    showError('Lỗi kết nối server');
+    setTimeout(resume, 2000);
+  }
+}
+
+function resume() {
+  isPaused = false;
+  lastToken = null;
+  document.getElementById('scan-line').style.animationPlayState = 'running';
+  document.getElementById('result-panel').innerHTML = '<div class="result-idle">Sẵn sàng quét QR...</div>';
+}
+
+function showResult(r) {
+  let html = '';
+  if (r.status === 'ok') {
+    html = `
+      <div class="result-card ok">
+        <div class="result-top">
+          <div class="result-icon">✓</div>
+          <div class="result-body">
+            <div class="result-status">Check-in thành công</div>
+            <div class="result-name">${esc(r.guest.name)}</div>
+            <div class="result-meta">${esc(r.guest.info || '')}${r.guest.info ? ' • ' : ''}${r.guest.checked_at}</div>
+          </div>
+        </div>
+      </div>`;
+  } else if (r.status === 'duplicate') {
+    html = `
+      <div class="result-card duplicate">
+        <div class="result-top">
+          <div class="result-icon" style="color:white">!</div>
+          <div class="result-body">
+            <div class="result-status">QR đã sử dụng rồi!</div>
+            <div class="result-name">${esc(r.guest.name)}</div>
+            <div class="result-meta">Đã check-in lúc ${esc(r.guest.checked_at)}</div>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    html = `
+      <div class="result-card invalid">
+        <div class="result-top">
+          <div class="result-icon">?</div>
+          <div class="result-body">
+            <div class="result-status">Không hợp lệ</div>
+            <div class="result-name">QR không nhận ra</div>
+            <div class="result-meta">Token không thuộc danh sách</div>
+          </div>
+        </div>
+      </div>`;
+  }
+  document.getElementById('result-panel').innerHTML = html;
+}
+
+function showError(msg) {
+  document.getElementById('result-panel').innerHTML = `<div class="result-card invalid"><div class="result-top"><div class="result-icon">!</div><div class="result-body"><div class="result-status">Lỗi</div><div class="result-name">${msg}</div></div></div></div>`;
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function vibrate(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+// Click to resume
+document.getElementById('camera-wrap').addEventListener('click', () => {
+  if (isPaused) resume();
+});
+
+loadStats();
+setInterval(loadStats, 8000);
+startScanner();
+</script>
+</body>
+</html>
