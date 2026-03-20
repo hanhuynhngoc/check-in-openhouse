@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Quản trị Check-in</title>
+<title>Check-in management</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -148,15 +148,15 @@
   <!-- Stats -->
   <div class="stats">
     <div class="stat-card">
-      <div class="stat-label">Tổng khách mời</div>
+      <div class="stat-label">Total participant</div>
       <div class="stat-value" id="s-total">—</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Đã check-in</div>
+      <div class="stat-label">Checked-in</div>
       <div class="stat-value green" id="s-checked">—</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Chưa đến</div>
+      <div class="stat-label">Not arrive yet</div>
       <div class="stat-value gray" id="s-pending">—</div>
     </div>
   </div>
@@ -171,7 +171,7 @@
   <!-- Upload -->
   <div class="section">
     <div class="section-header">
-      <span class="section-title">Nhập danh sách khách mời</span>
+      <span class="section-title">Input participant list</span>
     </div>
     <div class="section-body">
       <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()"
@@ -179,8 +179,8 @@
         ondragleave="this.classList.remove('drag')"
         ondrop="handleDrop(event)">
         <div class="upload-icon">📂</div>
-        <div style="font-weight:500">Kéo thả hoặc nhấn để chọn file</div>
-        <div class="upload-hint">Hỗ trợ: CSV, TXT (một tên mỗi dòng) • Cột: "Họ tên", "Phòng ban"</div>
+        <div style="font-weight:500">Drop the file here or click to import</div>
+        <div class="upload-hint">Support: CSV, TXT (1 name per line) • Cột: "Name", "Department"</div>
         <input type="file" id="file-input" accept=".csv,.txt" style="display:none" onchange="uploadFile(this.files[0])">
       </div>
       <div class="add-row">
@@ -194,10 +194,10 @@
   <!-- Guest list -->
   <div class="section">
     <div class="section-header">
-      <span class="section-title">Danh sách khách mời</span>
+      <span class="section-title">Participant list</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="text" id="search" placeholder="Tìm kiếm..." style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:180px;background:var(--surface);color:var(--text)" oninput="filterGuests()">
-        <button class="btn btn-sm" onclick="exportAllQR()">⬇ Xuất tất cả QR</button>
+        <input type="text" id="search" placeholder="Searching..." style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:180px;background:var(--surface);color:var(--text)" oninput="filterGuests()">
+        <button class="btn btn-sm" onclick="exportAllQR()">⬇ Export all QR</button>
         <button class="btn btn-sm btn-danger" onclick="confirmReset()">🔄 Reset</button>
       </div>
     </div>
@@ -320,10 +320,10 @@ async function uploadFile(file) {
   if (!file) return;
   const fd = new FormData();
   fd.append('file', file);
-  showToast('Đang xử lý file...');
+  showToast('File processing...');
   const r = await fetch('/api/upload', { method: 'POST', body: fd }).then(r => r.json());
   if (r.success) {
-    showToast(`✓ Đã thêm ${r.inserted} khách mời`, 'success');
+    showToast(`✓ Added ${r.inserted} participants`, 'success');
     refresh();
   } else {
     showToast('Lỗi: ' + r.error, 'error');
@@ -345,15 +345,15 @@ async function addGuest() {
   if (r.success) {
     document.getElementById('add-name').value = '';
     document.getElementById('add-info').value = '';
-    showToast('✓ Đã thêm ' + name, 'success');
+    showToast('✓ Added ' + name, 'success');
     refresh();
   }
 }
 
 async function deleteGuest(id) {
-  if (!confirm('Xoá khách này?')) return;
+  if (!confirm('Delete this person?')) return;
   await fetch('/api/guests/' + id, { method: 'DELETE' });
-  showToast('Đã xoá');
+  showToast('Deleted');
   refresh();
 }
 
